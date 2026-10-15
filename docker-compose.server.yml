@@ -43,6 +43,8 @@ services:
       - "LMCACHE_L1_SIZE_GB=${LMCACHE_L1_SIZE_GB:-128}"
       - "MAX_JOBS=${LMCACHE_MAX_JOBS:-32}"
     volumes:
+      - ./.docker/data/vllm/:/root/.cache/huggingface:rw
+      - ./.docker/data/vllm-cache/:/root/.cache/vllm:rw
       - ./.docker/data/vllm/:/home/lmcache/.cache/huggingface:rw
       - ./.docker/data/vllm-cache/:/home/lmcache/.cache/vllm:rw
       - ./.docker/data/flashinfer-cache/:/home/lmcache/.cache/flashinfer:rw
