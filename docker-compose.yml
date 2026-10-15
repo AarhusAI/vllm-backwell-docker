@@ -9,6 +9,7 @@ services:
   vllm:
     # Lock by SHA to know working build
     image: lmcache/vllm-openai:latest-nightly@sha256:${VLLM_SHA:-fefb564a1d68cb188860b548885b116ca8374ed3a1ac07859cd8f067ddbfb808}
+    command: "--model ${VLLM_MODEL:-facebook/opt-125m} ${VLLM_OPTIONS:-}"
     restart: unless-stopped
     entrypoint:
       - /bin/bash
