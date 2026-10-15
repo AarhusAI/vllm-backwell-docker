@@ -19,6 +19,12 @@ model_list:
     guardrails:
       - message_trimming
 
+# Shared Redis so rate limits, budgets and router state are global across workers.
+router_settings:
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD
+
 guardrails:
   - guardrail_name: "message_trimming"
     litellm_params:

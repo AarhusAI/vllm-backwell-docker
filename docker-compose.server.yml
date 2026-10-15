@@ -72,6 +72,9 @@ services:
       # Separate UI login so the master key is never typed into a browser.
       UI_USERNAME: ${LITELLM_UI_USERNAME:?}
       UI_PASSWORD: ${LITELLM_UI_PASSWORD:?}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
     networks:
       - app
       - frontend
