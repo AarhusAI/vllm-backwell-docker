@@ -83,7 +83,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm.rule=Host(`${COMPOSE_LITELLM_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm.rule=Host(`${COMPOSE_DOMAIN}`)"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-litellm.loadbalancer.server.port=4000"
 
   postgres:
