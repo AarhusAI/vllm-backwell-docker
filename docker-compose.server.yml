@@ -66,6 +66,9 @@ services:
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?}
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?}@postgres:5432/litellm"
       STORE_MODEL_IN_DB: "False" # disable adding models to proxy via UI
+      # Separate UI login so the master key is never typed into a browser.
+      UI_USERNAME: ${LITELLM_UI_USERNAME:?}
+      UI_PASSWORD: ${LITELLM_UI_PASSWORD:?}
     networks:
       - app
       - frontend

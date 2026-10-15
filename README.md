@@ -34,6 +34,8 @@ Fill in `.env`. Variables the compose files **require** (`:?`):
 | `VLLM_API_KEY`           | vllm              |
 | `LITELLM_MASTER_KEY`     | litellm           |
 | `LITELLM_SALT_KEY`       | litellm           |
+| `LITELLM_UI_USERNAME`    | litellm (server)  |
+| `LITELLM_UI_PASSWORD`    | litellm (server)  |
 | `POSTGRES_PASSWORD`      | litellm, postgres |
 | `REDIS_PASSWORD`         | litellm, redis    |
 | `COMPOSE_PROJECT_NAME`   | Traefik labels    |
@@ -86,6 +88,8 @@ variant. Deleting the caches means a full re-download and recompile.
 
 ## Security
 
-This setup does not come with any authentication beyond the LiteLLM master key
-and the vLLM API key, and relies on correctly configured server firewalls to
-protect the exposed end-points.
+This setup does not come with any authentication beyond the LiteLLM master key,
+the admin UI login (`LITELLM_UI_USERNAME` / `LITELLM_UI_PASSWORD`) and the vLLM
+API key, and relies on correctly configured server firewalls to protect the
+exposed end-points. The admin UI at `/ui` is publicly reachable; use a long
+random UI password and keep it distinct from the master key.
