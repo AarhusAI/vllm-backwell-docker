@@ -1,0 +1,123 @@
+networks:
+  frontend:
+    external: true
+  app:
+    driver: bridge
+    internal: false
+
+services:
+  vllm:
+    # Lock by SHA to know working build
+    image: lmcache/vllm-openai:latest-nightly@sha256:${VLLM_SHA:-fefb564a1d68cb188860b548885b116ca8374ed3a1ac07859cd8f067ddbfb808}
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        lmcache server --l1-size-gb $${LMCACHE_L1_SIZE_GB:-128} --eviction-policy LRU &
+        sleep 5
+        exec vllm serve "$$@"
+      - --
+    shm_size: "${SHM_SIZE:-8gb}"
+    ipc: host
+    networks:
+      - app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 480s
+    ulimits:
+      memlock: -1
+    environment:
+      - "HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:?}"
+      - "VLLM_API_KEY=${VLLM_API_KEY:?}"
+      - "VLLM_USE_DEEP_GEMM=${VLLM_USE_DEEP_GEMM:-0}"
+      - "VLLM_USE_FLASHINFER_MOE_FP16=${VLLM_USE_FLASHINFER_MOE_FP16:-1}"
+      - "VLLM_USE_FLASHINFER_SAMPLER=${VLLM_USE_FLASHINFER_SAMPLER:-0}"
+      - "OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}"
+      - "LMCACHE_L1_SIZE_GB=${LMCACHE_L1_SIZE_GB:-128}"
+      - "MAX_JOBS=${LMCACHE_MAX_JOBS:-32}"
+    volumes:
+      - ./.docker/data/vllm/:/home/lmcache/.cache/huggingface:rw
+      - ./.docker/data/vllm-cache/:/home/lmcache/.cache/vllm:rw
+      - ./.docker/data/flashinfer-cache/:/home/lmcache/.cache/flashinfer:rw
+    deploy:
+      replicas: 1
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:${LITELLM_IMAGE:-v1.105.1-stable}
+    restart: unless-stopped
+    command: [
+      "--config", "/app/config.yaml",
+      "--num_workers", "${LITELLM_NUM_WORKS:-8}"
+    ]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?}@postgres:5432/litellm"
+      STORE_MODEL_IN_DB: "False" # disable adding models to proxy via UI
+    networks:
+      - app
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=frontend"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm.rule=Host(`${COMPOSE_LITELLM_DOMAIN}`)"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-litellm.loadbalancer.server.port=4000"
+    depends_on:
+      - postgres
+    healthcheck:
+      test: [ "CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\"" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+      - ./guardrails/message_overflow.py:/app/message_overflow.py
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=frontend"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm-http.rule=Host(`${COMPOSE_LITELLM_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm-http.entrypoints=web"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm-http.middlewares=redirect-to-https"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-litellm.rule=Host(`${COMPOSE_LITELLM_DOMAIN}`)"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-litellm.loadbalancer.server.port=4000"
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    networks:
+      - app
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_HOST: localhost
+    volumes:
+      - .docker/data/postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?}", "--appendonly", "yes"]
+    networks:
+      - app
+    volumes:
+      - .docker/data/redis:/data
